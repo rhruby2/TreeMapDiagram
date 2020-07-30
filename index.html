@@ -1,0 +1,128 @@
+<!--
+    07/28/2020
+
+    Author: Raymond Hruby II
+    Title: FCC: Tree Map Diagram
+
+    Resources:
+
+    https://devdocs.io/d3~5/d3-hierarchy
+
+    https://stackoverflow.com/questions/56623476/how-to-get-d3-treemap-cell-text-to-wrap-and-not-overflow-other-cells
+
+    https://stackoverflow.com/questions/38090104/javascript-foreach-how-to-loop-an-object
+-->
+
+<!DOCTYPE html>
+<meta charset="utf-8">
+<html lang="en">
+
+<head>
+    <title>RHII: Tree Map Diagram</title>
+
+    <link rel="stylesheet" type="text/css" href="index.css">
+    <!-- d3 Data Visualization Library-->
+    <script src="https://d3js.org/d3.v5.min.js"></script>
+</head>
+
+
+
+<body>
+    <script>
+        /* D3 CODE */
+        //data comes in hierarchical format
+        const DATA_URL = "https://cdn.freecodecamp.org/testable-projects-fcc/data/tree_map/video-game-sales-data.json"
+
+        const width = 800,
+            height = 600,
+            padding = 50;
+
+        const DATA_PROMISE = d3.json(DATA_URL); //Promise
+        DATA_PROMISE.then((data) => {
+            return createGraph(data);
+        })
+
+        function createGraph(data) {
+            let gameSystems = [];
+            for (const system in data.children) {
+                if (data.children[system]) {
+                   gameSystems.push(data.children[system].name)
+                }
+            }
+            console.log("GAME SYSTEMS:",gameSystems);
+
+            //adding padding to '.svg-container'
+            //* might need padding for tite and such if not putting in HTML *//
+            let svg = d3.select("#svg-container")
+                .append("svg")
+                .attr("width", width)
+                .attr("height", height)
+                
+            //sum() required for treemap hierarchical layout
+            let root = d3.hierarchy(data)
+                .sum((d) => d.value)
+                //sorts in decending order
+                .sort(function(a, b) { return b.value - a.value; })
+
+            console.log("LEAVES", root.leaves());
+
+            /*  Treemap created nodes with these parameters:
+
+                node.x0 - the left edge of the rectangle
+                node.y0 - the top edge of the rectangle
+                node.x1 - the right edge of the rectangle
+                node.y1 - the bottom edge of the rectangle
+            */
+            let treemap = d3.treemap()
+                .size([width, height])
+                .padding(2) //sets inner AND outer padding
+                (root)
+
+            let cell = svg.selectAll('g')
+                .data(root.leaves())
+                .enter()
+                .append('g')
+                .attr('transform', (d) => `translate(${d.x0},${d.y0})`)
+            //tooltip here
+
+            cell.append("rect")
+                .attr('class', 'tile')
+                .attr('data-name', (d) => d.data.name)
+                .attr('data-category', (d) => d.data.category)
+                .attr('data-value', (d) => d.data.value)
+                //.attr('x', (d) => d.x0)
+                //.attr('y', (d) => d.y0)
+                .attr('width', (d) => d.x1 - d.x0)
+                .attr('height', (d) => d.y1 - d.y0)
+                .style("stroke", "black")
+                .style("fill", "slateblue");
+
+            cell.append("text")
+                .selectAll('tspan')
+                .data((d) => d.data.name.split(/(?=[A-Z][^A-Z])/g))
+                .enter()
+                .append('tspan')
+                .attr('class', 'game-title')
+                .attr('x', 4)
+                .attr('y', (d, i) => 10 + 10 * i)
+                //.attr('x', (d) => d.x0 + 5)
+                //.attr('y', (d) => d.y0 + 10)
+                .text((d) => d)
+                .attr("fill", 'white');
+        }
+
+        function testJSON(json) {
+            console.log("testJSON()");
+            console.log(Object.keys(json));
+        }
+    </script>
+
+    <main>
+        <figure id="svg-container"></figure>
+    </main>
+</body>
+
+<!-- FreeCodeCamp Testing Suite-->
+<script src="https://cdn.freecodecamp.org/testable-projects-fcc/v1/bundle.js"></script>
+
+</html>
