@@ -1,16 +1,18 @@
 <!--
-    07/28/2020
+    07/31/2020
 
     Author: Raymond Hruby II
     Title: FCC: Tree Map Diagram
 
     Resources:
 
-    https://devdocs.io/d3~5/d3-hierarchy
+    devdocs.io/d3~5/d3-hierarchy
 
-    https://stackoverflow.com/questions/56623476/how-to-get-d3-treemap-cell-text-to-wrap-and-not-overflow-other-cells
+    stackoverflow.com/questions/56623476/how-to-get-d3-treemap-cell-text-to-wrap-and-not-overflow-other-cells
 
-    https://stackoverflow.com/questions/38090104/javascript-foreach-how-to-loop-an-object
+    stackoverflow.com/questions/23416316/how-do-we-change-the-tick-values-generated-by-a-linear-scale-in-a-d3-js-line-plo
+
+    Colors Provided By: medialab.github.io/iwanthue/
 -->
 
 <!DOCTYPE html>
@@ -18,7 +20,7 @@
 <html lang="en">
 
 <head>
-    <title>RHII: Tree Map Diagram</title>
+    <title>RHII: D3 Tree Map Diagram</title>
 
     <link rel="stylesheet" type="text/css" href="index.css">
     <!-- d3 Data Visualization Library-->
@@ -31,7 +33,7 @@
     <script>
         /* D3 CODE */
         //data comes in hierarchical format
-        const DATA_URL = "https://cdn.freecodecamp.org/testable-projects-fcc/data/tree_map/video-game-sales-data.json"
+        const DATA_URL = "https://cdn.freecodecamp.org/testable-projects-fcc/data/tree_map/video-game-sales-data.json";
 
         const width = 800,
             height = 600,
@@ -43,21 +45,68 @@
         })
 
         function createGraph(data) {
-            let gameSystems = [];
+            const gameSystems = [];
+
             for (const system in data.children) {
                 if (data.children[system]) {
                    gameSystems.push(data.children[system].name)
                 }
             }
-            console.log("GAME SYSTEMS:",gameSystems);
+            console.log("GAME SYSTEMS:",gameSystems.length);    //18 Game Systems
+            const colors = ["#a24a68",
+                    "#7eb539",
+                    "#af5ed2",
+                    "#59bd72",
+                    "#cc4aa1",
+                    "#3f8653",
+                    "#626ad7",
+                    "#d89b37",
+                    "#628dcd",
+                    "#d15135",
+                    "#4bbfbe",
+                    "#d83f68",
+                    "#6f752c",
+                    "#82589f",
+                    "#b7ad5b",
+                    "#d28ece",
+                    "#a96938",
+                    "#e38484"]
 
-            //adding padding to '.svg-container'
-            //* might need padding for tite and such if not putting in HTML *//
+            let colorScale = d3.scaleOrdinal()
+                .domain(gameSystems)
+                .range(colors);
+            //console.log("COLOR RANGE:",colorScale.range());
+
             let svg = d3.select("#svg-container")
                 .append("svg")
-                .attr("width", width)
-                .attr("height", height)
-                
+                .attr("width", 8*padding + width)
+                .attr("height", 4*padding + height)
+            
+            /** TOOLTIP **/
+            let tooltip = d3.select("#svg-container")
+                .append('div')
+                .attr('id','tooltip')
+                .style('opacity',0); //init invisible
+
+            let mouseOver = (d) => {
+                tooltip
+                    .html(() => formatTooltip(d))
+                    .attr('data-value', d.data.value)
+                    .style('opacity',0.9)
+                    .style('transition','opacity 0.3s')
+                    .style('left', d3.event.pageX+10 + "px")   //provides accurate positioning in respect to the treemap tiles
+                    .style('top', d3.event.pageY-20 + "px")
+                    //.style("left", d3.mouse(d3.event.target)[0] + "px")
+                    //.style("top", d3.mouse(d3.event.target)[1] + "px");
+            }
+
+            let mouseLeave = (d) => {
+                tooltip
+                    .style('opacity',0)
+                    .style('transition','opacity 0.3s')
+            }
+
+            /** TREEMAP **/
             //sum() required for treemap hierarchical layout
             let root = d3.hierarchy(data)
                 .sum((d) => d.value)
@@ -75,40 +124,108 @@
             */
             let treemap = d3.treemap()
                 .size([width, height])
-                .padding(2) //sets inner AND outer padding
+                .paddingOuter(2)
+                .paddingInner(1)
                 (root)
 
             let cell = svg.selectAll('g')
                 .data(root.leaves())
                 .enter()
                 .append('g')
-                .attr('transform', (d) => `translate(${d.x0},${d.y0})`)
-            //tooltip here
+                .attr('transform', (d) => `translate(${4*padding + d.x0},${2*padding + d.y0})`)
+                .on('mouseover',mouseOver)
+                .on('mousemove',mouseOver)
+                .on('mouseleave',mouseLeave);
+                
 
-            cell.append("rect")
+            let tile = cell.append("rect")
                 .attr('class', 'tile')
                 .attr('data-name', (d) => d.data.name)
                 .attr('data-category', (d) => d.data.category)
                 .attr('data-value', (d) => d.data.value)
-                //.attr('x', (d) => d.x0)
+                //.attr('x', (d) => d.x0)   //moved to cell
                 //.attr('y', (d) => d.y0)
                 .attr('width', (d) => d.x1 - d.x0)
                 .attr('height', (d) => d.y1 - d.y0)
-                .style("stroke", "black")
-                .style("fill", "slateblue");
+                .style("stroke", "none")
+                .style("fill", (d) => colorScale(d.data.category))
 
             cell.append("text")
-                .selectAll('tspan')
+                .selectAll('tspan') //'tspan' element allows for adjustment of text position
+                //splits Title Name by capitalized word, '[^A-Z]' so doesn't split grouped capitals, for example, roman numerals 
                 .data((d) => d.data.name.split(/(?=[A-Z][^A-Z])/g))
                 .enter()
                 .append('tspan')
                 .attr('class', 'game-title')
                 .attr('x', 4)
                 .attr('y', (d, i) => 10 + 10 * i)
-                //.attr('x', (d) => d.x0 + 5)
-                //.attr('y', (d) => d.y0 + 10)
                 .text((d) => d)
                 .attr("fill", 'white');
+
+            /** TITLE **/
+            svg.append('text')
+                .attr('id','title')
+                .text('Top 100 Game Sales')
+                .attr('text-anchor','middle')
+                .style('fill','white')
+                .attr('x',(8*padding+width) / 2)
+                .attr('y',padding);
+            
+            /** DESCRIPTION **/
+            svg.append('text')
+                .attr('id','description')
+                .text('The Best Selling Videogames By Platform')
+                .attr('text-anchor','middle')
+                .style('fill','white')
+                .attr('x',(8*padding+width)/2)
+                .attr('y',padding+30)
+
+            /** LEGEND **/
+            const side = 30;
+
+            let legendYScale = d3
+                .scaleLinear()
+                .domain([0, gameSystems.length-1])
+                .range([0, side*(gameSystems.length-1)]);
+
+            let legendYAxis = d3
+                .axisRight()
+                .scale(legendYScale)
+                .tickValues([0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17])
+                .tickFormat( (d,i) => {     //so label can be name of platform
+                    return gameSystems[i];
+                })
+
+            var legend = svg.append('g')
+                .attr('id','legend')
+            
+            legend.append('g')
+                .attr('id','legendLabels')
+                .call(legendYAxis)
+                .style('color','white')
+                .style('font-size','20px')
+                .attr('transform',`translate(${6*padding+width}, ${(padding/2) + 2*padding + (side/2)})`)
+            
+            legend.selectAll('legendIcons')
+                .data(colorScale.range())
+                .enter()
+                .append('rect')
+                .attr('class','legend-item')
+                .attr('x',0)
+                .attr('y',(d,i) => side * i)
+                .attr('width',side)
+                .attr('height',side)
+                .style('fill',(d) => d)
+                .attr('transform',`translate(${5*padding+width+(padding/2)}, ${(padding/2) + 2*padding})`)
+        }
+
+        function formatTooltip(game) {
+            let name = game.data.name;
+            let platform = game.data.category;
+            let value = game.data.value;
+
+           return `${name} on ${platform}<br> : ${value}`;
+           //return `${d3.mouse(d3.event.target)[0]},${d3.mouse(d3.event.target)[1]}`;
         }
 
         function testJSON(json) {
